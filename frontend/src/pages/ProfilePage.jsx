@@ -10,17 +10,36 @@ const ProfilePage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file.");
+      return;
+    }
 
-    reader.readAsDataURL(file);
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
 
-    reader.onload = async () => {
-      const base64Image = reader.result;
-      setSelectedImg(base64Image);
-      await updateProfile({ profilePic: base64Image });
+    img.onload = async () => {
+      const MAX_WIDTH = 500; // max width
+      const scaleSize = MAX_WIDTH / img.width;
+      const canvas = document.createElement("canvas");
+      canvas.width = MAX_WIDTH;
+      canvas.height = img.height * scaleSize;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Compress image to JPEG at 70% quality
+      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+      setSelectedImg(compressedBase64);
+
+      try {
+        await updateProfile({ profilePic: compressedBase64 });
+      } catch (error) {
+        console.error("Error updating profile:", error);
+        alert("Failed to update profile. Try a smaller image.");
+      }
     };
   };
-
   return (
     <div className="h-screen pt-20">
       <div className="max-w-2xl mx-auto p-4 py-8">
