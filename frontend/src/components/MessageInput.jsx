@@ -8,10 +8,10 @@ const MessageInput = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
-  const { sendMessage, selectedUser } = useChatStore();
+  const { sendMessage } = useChatStore();
 
   const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -19,6 +19,7 @@ const MessageInput = () => {
       return;
     }
 
+    // ✅ Limit file size to 2MB
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image size must be under 2MB");
       return;
@@ -36,12 +37,6 @@ const MessageInput = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-
-    if (!selectedUser?._id) {
-      toast.error("Please select a user to chat with");
-      return;
-    }
-
     if (!text.trim() && !imagePreview) return;
 
     setIsSending(true);
@@ -50,11 +45,14 @@ const MessageInput = () => {
         text: text.trim(),
         image: imagePreview,
       });
+
+      // ✅ Clear input and reset file
       setText("");
-      removeImage();
+      setImagePreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
       console.error("Failed to send message:", error);
-      toast.error(error?.response?.data?.message || "Failed to send message");
+      toast.error(error.response?.data?.message || "Failed to send message");
     } finally {
       setIsSending(false);
     }
@@ -62,6 +60,7 @@ const MessageInput = () => {
 
   return (
     <div className="p-4 w-full border-t border-base-300">
+      {/* Image Preview */}
       {imagePreview && (
         <div className="mb-3 flex items-center gap-2">
           <div className="relative">
@@ -82,6 +81,7 @@ const MessageInput = () => {
         </div>
       )}
 
+      {/* Input Form */}
       <form onSubmit={handleSendMessage} className="flex items-center gap-2">
         <div className="flex-1 flex gap-2">
           <input
@@ -92,6 +92,7 @@ const MessageInput = () => {
             onChange={(e) => setText(e.target.value)}
           />
 
+          {/* Hidden File Input */}
           <input
             type="file"
             accept="image/*"
@@ -100,16 +101,18 @@ const MessageInput = () => {
             onChange={handleImageChange}
           />
 
+          {/* Image Upload Button */}
           <button
             type="button"
-            className={`btn btn-circle hover:bg-base-300 transition-colors
-                       ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
+            className={`hidden sm:flex btn btn-circle hover:bg-base-300 transition-colors
+                        ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
             onClick={() => fileInputRef.current?.click()}
           >
             <Image size={20} />
           </button>
         </div>
 
+        {/* Send Button */}
         <button
           type="submit"
           className="btn btn-sm btn-circle"
