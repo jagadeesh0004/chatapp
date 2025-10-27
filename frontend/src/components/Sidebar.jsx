@@ -13,7 +13,7 @@ const Sidebar = () => {
 
   useEffect(() => {
     getUsers();
-  }, [getUsers]);
+  }, []);
 
   const otherUsers = users.filter((user) => user._id !== authUser?._id);
 
