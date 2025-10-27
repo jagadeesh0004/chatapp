@@ -1,121 +1,64 @@
 import { create } from "zustand";
-import toast from "react-hot-toast";
-import { axiosInstance } from "../lib/axios";
-import { useAuthStore } from "./useAuthStore";
+import { io } from "socket.io-client";
+import axios from "axios";
 
-let unsubscribeLocal = null;
+const socket = io(import.meta.env.VITE_API_URL, {
+  withCredentials: true,
+  transports: ["websocket"],
+});
 
-export const useChatStore = create((set, get) => ({
-  messages: [],
-  users: [],
+const useChatStore = create((set, get) => ({
   selectedUser: null,
-  isUsersLoading: false,
+  messages: [],
   isMessagesLoading: false,
 
-  // Fetch all chat users
-  getUsers: async () => {
-    set({ isUsersLoading: true });
-    try {
-      const res = await axiosInstance.get("/messages/users");
-      set({ users: res.data });
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to fetch users");
-    } finally {
-      set({ isUsersLoading: false });
-    }
-  },
+  // ✅ --- User selection
+  setSelectedUser: (user) => set({ selectedUser: user, messages: [] }),
 
-  // Fetch messages for selected user
+  // ✅ --- Fetch messages safely
   getMessages: async (userId) => {
-    if (!userId) return;
-    set({ isMessagesLoading: true });
     try {
-      const res = await axiosInstance.get(`/messages/${userId}`);
-      set({ messages: res.data });
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to load messages");
-    } finally {
+      set({ isMessagesLoading: true });
+      const res = await axios.get(`/api/messages/${userId}`);
+      set({ messages: res.data, isMessagesLoading: false });
+    } catch (err) {
+      console.error("Error fetching messages:", err);
       set({ isMessagesLoading: false });
     }
   },
 
-  // Send message (text or image)
-  sendMessage: async (messageData) => {
+  // ✅ --- Subscribe to messages (prevent multiple listeners)
+  subscribeToMessages: (userId) => {
     const { selectedUser } = get();
+
     if (!selectedUser?._id) return;
 
-    try {
-      const res = await axiosInstance.post(
-        `/messages/send/${selectedUser._id}`,
-        messageData
-      );
-      // append safely
-      set((state) => ({ messages: [...state.messages, res.data] }));
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to send message");
-    }
-  },
+    // Remove existing listener before adding new one
+    socket.off("newMessage");
 
-  // ✅ Real-time message subscription
-  subscribeToMessages: () => {
-    try {
-      if (typeof unsubscribeLocal === "function") {
-        unsubscribeLocal();
-        unsubscribeLocal = null;
+    const handleNewMessage = (message) => {
+      // Ensure message belongs to current chat
+      if (message.senderId === selectedUser._id || message.receiverId === selectedUser._id) {
+        set((state) => ({
+          messages: [...state.messages, message],
+        }));
       }
-    } catch {
-      unsubscribeLocal = null;
-    }
-
-    const { selectedUser } = get();
-    const socket = useAuthStore.getState().socket;
-    if (!socket || !selectedUser?._id) return;
-
-    const handleNewMessage = (newMessage) => {
-      const currentSelected = get().selectedUser;
-      if (!currentSelected) return;
-
-      // Only messages related to this chat
-      if (
-        newMessage.senderId !== currentSelected._id &&
-        newMessage.receiverId !== currentSelected._id
-      ) {
-        return;
-      }
-
-      set((state) => {
-        const exists = state.messages.some((m) => m._id === newMessage._id);
-        if (exists) return state;
-        return { messages: [...state.messages, newMessage] };
-      });
     };
 
-    // ✅ Avoid stacking multiple listeners
-    socket.off("newMessage", handleNewMessage);
     socket.on("newMessage", handleNewMessage);
 
-    // store unsubscribe safely
-    unsubscribeLocal = () => {
-      try {
-        socket.off("newMessage", handleNewMessage);
-      } catch {
-        // ignore
-      }
-    };
+    // Store reference for unsubscribe
+    set({ unsubscribeLocal: () => socket.off("newMessage", handleNewMessage) });
   },
 
-  // Unsubscribe safely
+  // ✅ --- Unsubscribe cleanly
   unsubscribeFromMessages: () => {
-    try {
-      if (typeof unsubscribeLocal === "function") {
-        unsubscribeLocal();
-        unsubscribeLocal = null;
-      }
-    } catch {
-      unsubscribeLocal = null;
+    const { unsubscribeLocal } = get();
+    if (typeof unsubscribeLocal === "function") {
+      unsubscribeLocal();
+      set({ unsubscribeLocal: null });
     }
   },
-
-  // Select user
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
 }));
+
+export default useChatStore;
