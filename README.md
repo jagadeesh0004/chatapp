@@ -1,3 +1,4 @@
+Demo - https://chatapp-c5nf.onrender.com
 ChatApp — Project Report
 Repository: jagadeesh0004/chatapp
 
@@ -61,3 +62,4 @@ Use Redis or a managed pub/sub solution for scaling Socket.IO across multiple se
 Configure deployment pipelines and environment variable management.
 Conclusion
 ChatApp is designed as a modular, developer-friendly real-time chat foundation that leverages React for a componentized UI, axios for REST interactions, Tailwind for rapid responsive styling, and Socket.IO for low-latency messaging. The architecture balances immediate usability with clear extension points for persistence, authentication, and horizontal scaling. The next practical steps are to add persistent storage, implement authentication, and prepare CI/CD and deployment configurations.
+
