@@ -3,13 +3,6 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
 
-/**
- * NOTE:
- * - we keep a local unsubscribe function (unsubscribeLocal) outside the zustand state
- *   to avoid writing it into the store (which would cause extra re-renders).
- * - subscribeToMessages always clears a previous subscription first.
- */
-
 let unsubscribeLocal = null;
 
 export const useChatStore = create((set, get) => ({
@@ -32,7 +25,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Fetch messages with selected user
+  // Fetch messages for selected user
   getMessages: async (userId) => {
     if (!userId) return;
     set({ isMessagesLoading: true });
@@ -56,77 +49,73 @@ export const useChatStore = create((set, get) => ({
         `/messages/send/${selectedUser._id}`,
         messageData
       );
-      // functional update to avoid stale state issues
+      // append safely
       set((state) => ({ messages: [...state.messages, res.data] }));
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to send message");
     }
   },
 
-  // Real-time message listener
+  // ✅ Real-time message subscription
   subscribeToMessages: () => {
-    // clear any previous subscription first (safe-guard)
     try {
       if (typeof unsubscribeLocal === "function") {
         unsubscribeLocal();
         unsubscribeLocal = null;
       }
-    } catch (err) {
-      // ignore
-      // (we still proceed to create a new subscription)
+    } catch {
+      unsubscribeLocal = null;
     }
 
     const { selectedUser } = get();
-    if (!selectedUser) return;
-
     const socket = useAuthStore.getState().socket;
-    if (!socket) return;
+    if (!socket || !selectedUser?._id) return;
 
-    // Handler captures the current selectedUser by value from get()
     const handleNewMessage = (newMessage) => {
-      // Re-check selectedUser at runtime to avoid stale closures
       const currentSelected = get().selectedUser;
       if (!currentSelected) return;
-      // Only add messages from the currently selected user (or messages to/from auth user)
-      if (newMessage.senderId !== currentSelected._id && newMessage.receiverId !== currentSelected._id) {
+
+      // Only messages related to this chat
+      if (
+        newMessage.senderId !== currentSelected._id &&
+        newMessage.receiverId !== currentSelected._id
+      ) {
         return;
       }
 
-      // Append message safely
       set((state) => {
-        // avoid adding duplicate message if same id already exists
         const exists = state.messages.some((m) => m._id === newMessage._id);
         if (exists) return state;
         return { messages: [...state.messages, newMessage] };
       });
     };
 
-    // Register listener
+    // ✅ Avoid stacking multiple listeners
+    socket.off("newMessage", handleNewMessage);
     socket.on("newMessage", handleNewMessage);
 
-    // Store unsubscribe in local variable (not zustand state)
+    // store unsubscribe safely
     unsubscribeLocal = () => {
       try {
         socket.off("newMessage", handleNewMessage);
-      } catch (err) {
+      } catch {
         // ignore
       }
     };
   },
 
-  // Stop listening
+  // Unsubscribe safely
   unsubscribeFromMessages: () => {
     try {
       if (typeof unsubscribeLocal === "function") {
         unsubscribeLocal();
         unsubscribeLocal = null;
       }
-    } catch (err) {
-      // ignore errors during cleanup
+    } catch {
       unsubscribeLocal = null;
     }
   },
 
-  // Set selected user
+  // Select user
   setSelectedUser: (selectedUser) => set({ selectedUser }),
 }));
