@@ -19,7 +19,6 @@ const MessageInput = () => {
       return;
     }
 
-    // ✅ Limit file size to 2MB
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image size must be under 2MB");
       return;
@@ -46,7 +45,6 @@ const MessageInput = () => {
         image: imagePreview,
       });
 
-      // ✅ Clear input and reset file
       setText("");
       setImagePreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -101,11 +99,11 @@ const MessageInput = () => {
             onChange={handleImageChange}
           />
 
-          {/* Image Upload Button */}
+          {/* Image Upload Button (visible on all screens) */}
           <button
             type="button"
-            className={`hidden sm:flex btn btn-circle hover:bg-base-300 transition-colors
-                        ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
+            className={`btn btn-circle hover:bg-base-300 transition-colors
+                       ${imagePreview ? "text-emerald-500" : "text-zinc-400"}`}
             onClick={() => fileInputRef.current?.click()}
           >
             <Image size={20} />
