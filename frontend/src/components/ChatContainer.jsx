@@ -1,6 +1,5 @@
-import { useChatStore } from "../store/useChatStore";
 import { useEffect, useRef } from "react";
-
+import { useChatStore } from "../store/useChatStore";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
@@ -19,12 +18,15 @@ const ChatContainer = () => {
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
+  // ✅ FIX: Only depend on selectedUser._id (not store functions)
   useEffect(() => {
+    if (!selectedUser?._id) return; // prevent running when no user selected
     getMessages(selectedUser._id);
     subscribeToMessages();
     return () => unsubscribeFromMessages();
-  }, [selectedUser._id]);
+  }, [selectedUser?._id]);
 
+  // ✅ Auto-scroll when messages change
   useEffect(() => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -49,7 +51,9 @@ const ChatContainer = () => {
         {messages.map((message) => (
           <div
             key={message._id}
-            className={`chat ${message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
+            className={`chat ${
+              message.senderId === authUser._id ? "chat-end" : "chat-start"
+            }`}
           >
             <div className=" chat-image avatar">
               <div className="size-10 rounded-full border">
@@ -88,4 +92,5 @@ const ChatContainer = () => {
     </div>
   );
 };
+
 export default ChatContainer;
